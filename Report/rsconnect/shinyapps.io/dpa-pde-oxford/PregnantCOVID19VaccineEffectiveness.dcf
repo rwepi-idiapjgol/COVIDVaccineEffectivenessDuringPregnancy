@@ -1,0 +1,13 @@
+name: PregnantCOVID19VaccineEffectiveness
+title: PregnantCOVID19VaccineEffectiveness
+username: dpa-pde-oxford
+account: dpa-pde-oxford
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 11927025
+bundleId: 9889128
+url: https://dpa-pde-oxford.shinyapps.io/PregnantCOVID19VaccineEffectiveness/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: .Rprofile|addMetaAnalysis.R|figures.R|figuresMain.R|getShinyData.R|icpeFigures.R|prepare_data.R|shinyData-meta.Rdata|shinyData-try.Rdata|tables.R|updateCDMName.R|data|figures

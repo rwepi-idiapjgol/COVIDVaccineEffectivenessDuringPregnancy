@@ -1,0 +1,12 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rdata
+*.zip
+*.png
+*.csv
+*.txt
+Report/data/*
+Study/CodeToRunDevelop.R
+

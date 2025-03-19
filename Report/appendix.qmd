@@ -1,0 +1,1602 @@
+---
+title: "APPENDIX"
+subtitle: "Effectiveness of COVID-19 mRNA primary and booster vaccination during pregnancy: a target trial emulation and meta-analysis of data from 4 European countries"
+format:
+  docx:
+    reference-doc: reference-doc.docx
+execute:
+  echo: false
+toc: true
+toc-title: "Table of Contents"
+---
+
+```{r, message=FALSE, warning=FALSE}
+# prepare packages and data
+library(dplyr)
+library(readr)
+library(here)
+library(tidyr)
+library(stringr)
+library(visOmopResults)
+library(omopgenerics)
+library(ggplot2)
+library(forestploter)
+library(latex2exp)
+library(egg)
+library(grid)
+library(ggh4x)
+library(ggtext)
+library(PatientProfiles)
+library(knitr)
+
+load(here("shinyData-meta.Rdata"))
+source(here("functions.R"))
+
+num_text <- 1
+num_figure <- 1
+num_table <- 1
+
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, results = 'asis')
+```
+
+
+```{r}
+# TTE ----
+cat("\n\n\\pagebreak\n")
+cat("## ", paste0("**Appendix Table ", num_table, ":** Specifications of the target trials."))
+cat("\n")
+num_table <- num_table + 1
+cat("\n")
+
+# Database description ----
+cat("\n\n\\pagebreak\n")
+cat("## ", paste0("**Appendix Text ", num_text, ":** Descriptions of the data sources."))
+cat("\n")
+num_text <- num_text + 1
+
+# # COVID-19 vaccination campaign in each country
+# cat("\n\n\\pagebreak\n")
+# cat(paste0("## **Appendix Text ", num_text, ":** COVID-19 vaccination campaign in each country."))
+# cat("\n")
+# num_text <- num_text + 1
+# cat("\n")
+
+# Study Design Diagram and Propensity Score Covariates ----
+cat("\n\n\\pagebreak\n")
+cat("## ", paste0("**Appendix Figure ", num_figure, ":** Study Design Diagram and Propensity Score Covariates."))
+cat("\n")
+include_graphics(here("figures", "Appendix", "HARPER.png"))
+num_figure <- num_figure + 1
+
+# NCO list?
+# cat("\n\n\\pagebreak\n")
+# cat("## ", paste0("**Appendix Table ", num_table, ":** List of Negative Control Outcome with their SNDOMED ancestor code used for their identification."))
+# cat("\n")
+# num_table <- num_table + 1
+
+# Re-enrolment ----
+cat("\n\n\\pagebreak\n")
+cat("## ", paste0("**Appendix Table ", num_table, ":** Count and percentage of re-enrolled pregnant women across analyses and databases."))
+num_table <- num_table + 1
+cat("\n")
+data$reenrollment |>
+    mutate(cdm_name = if_else(cdm_name == "UiO Algorithm", "UiO", toupper(cdm_name))) |>
+  filter(
+    strata_name == "overall", covid_definition == "diagnostic_test", 
+    cdm_name %in% c("SCIFI-PEARL", "UiO", "SIDIAP", "CPRD GOLD")
+  ) |>
+  mutate(
+    Analysis = factor(
+      comparison, levels = c("none_first", "complete_booster"),
+      labels = c("Primary Vaccination Schema vs. Unvaccinated", "Booster vs. Primary Vaccination Schema")
+    ),
+    "CDM name" = factor(
+      cdm_name, levels = c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO")
+    ),
+    "N (%)" = paste0(count, " (", round(percentage, 2), "%)")
+  ) |>
+  splitStrata() |>
+  select("CDM name", "Analysis", "N (%)") |>
+  fxTable(groupNameCol = "Analysis", groupNameAsColumn = TRUE) |>
+  flextable::set_table_properties(width = 1, layout = "autofit") |>
+  flextable::flextable_to_rmd()
+
+# Flowcharts ----
+cdmName = c("CPRD GOLD", "SIDIAP", "UiO")
+for (ii in 1:length(cdmName)) {
+  cat("\n\n\\pagebreak\n")
+  cat("## ",paste0("**Appendix Figure ", num_figure, ":** Flowchart for study populations in the ", cdmName[ii], " database."))
+  cat("\n")
+  num_figure <- num_figure + 1
+  # include_graphics(here("figures", "Appendix", paste0("Flowchart", cdmName[ii], ".png")))
+  cat(paste0("![](", here("figures", "Appendix", paste0("Flowchart", cdmName[ii], ".png)")), "\n"))
+}
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+# BASELINE CHARACTERISTICS ----
+captions <- expand_grid(
+  cdm_name = c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO"),
+  comparison = c("none_first", "complete_booster")
+) |>
+  mutate(
+    caption = paste0("Baseline characteristics of the study population in the ", cdm_name, " database, for the ", comparison, " analysis."),
+    caption = if_else(
+      comparison == "complete_booster",
+      gsub("complete_booster", "Booster vs. Primary Vaccination Schema", caption),
+      gsub("none_first", "Primary Vaccination Schema vs. Unvaccinated", caption)
+    )
+  )
+
+orderVarsName <- tibble(
+  variable_name = c(
+    "Number records", "Age", "Age group", "Trimester", 
+    "Vaccine brand", "Number prior pregnancies", "Number visits prior year", 
+    "Prior observation", "Covid-19 any time prior", "Ohter vaccines any time prior",
+    "Conditions any time prior",  "Drugs prior 180 days" 
+  ),
+  Covariate = factor(
+    c(
+      "Number subjects", "Age (Years)", "Age Group", "Gestational Trimester",  
+      "Vaccine Product", "Previous Pregnancies", "Healthcare Visits (Past Year)", "Days of Prior Observation",  
+      "COVID-19 Infection (Any Time Prior)", "Other Vaccinations (Any Time Prior)", "Comorbidities (Any Time Prior)",  
+      "Medications Prescribed (Last 180 Days)"  
+    ),
+    levels = c(
+      "Number records", "Age (Years)", "Age Group", "Gestational Trimester",  
+      "Vaccine Product", "Previous Pregnancies", "Healthcare Visits (Past Year)", "Days of Prior Observation",  
+      "COVID-19 Infection (Any Time Prior)", "Other Vaccinations (Any Time Prior)", "Comorbidities (Any Time Prior)",  
+      "Medications Prescribed (Last 180 Days)"  
+    ))
+)
+
+baseline <- data$baseline |>
+  mutate(cdm_name = if_else(cdm_name == "UiO Algorithm", "UiO", toupper(cdm_name))) |>
+  filter(
+    strata_name == "overall", covid_definition == "diagnostic_test", 
+    !estimate_name %in% c("min", "max", "q05", "q95", "mean", "sd"),
+    !variable_level %in% str_to_sentence(gsub("_", " ", c(
+      "covid_test", "chronic_liver_disease", "bronchiectasis", "pulmonary_hypertension",
+      "eclampsia_preeclampsia", "schizophrenia_spectrum_disorder", "gestational_diabetes",
+      "hematological_malignancies", "cerebrovascular_disease", "chronic_obstructive_lung_disease",
+      "pulmonary_embolism", "Immunoglobulins", "Propulsives", "Antiacids", "Antiseptics and desinfectants",
+      "Obstructive respiratory diseases", "Epilepsy", "Antiacids"
+      ))),
+    cdm_name %in% c("SCIFI-PEARL", "UiO", "SIDIAP", "CPRD GOLD")
+  ) |>
+  splitAll() |>
+  select(cdm_name, exposed, variable_name, variable_level, estimate_name, estimate_type, estimate_value, comparison) |>
+  formatEstimateValue() |>
+  formatEstimateName(c(
+    "N (%)" = "<count> (<percentage>%)", "N" = "<count>", "Median (Q25 - Q75)" = "<median> (<q25> - <q75>)"
+  )) |>
+  inner_join(orderVarsName, by = "variable_name") |>
+  mutate(
+    variable_level = case_when(
+      variable_level == "Cohort 1" ~ "-",
+      variable_level == "Covid diagnostic test" ~ "-",
+      variable_level == "Diabetes mellitus" ~ "Diabetes (any type)",
+      variable_level %in% c("Hiv", "Pcos") ~ toupper(variable_level),
+      .default = variable_level
+    ),
+    estimate_value = if_else(
+      Covariate == "Vaccine Product" & exposed == "Unexposed", "-", estimate_value
+    )
+  )
+
+
+for (ii in 1:nrow(captions)) {
+  # prep
+  tab.ii <- baseline |>
+    inner_join(captions[ii,] |> select(!c("caption")), by = c("cdm_name", "comparison")) |>
+    select(Covariate, `Covariate level` = variable_level, Estimate = estimate_name, Cohort = exposed, estimate_value) |>
+    formatHeader(header = c("Cohort")) |>
+    arrange(Covariate)
+  if (captions[ii,] |> pull("cdm_name") == "SCIFI-PEARL") {
+    tab.ii <- tab.ii |> filter(Covariate != "Other Vaccinations (Any Time Prior)")
+  }
+  
+  # display
+  cat("\n\n\\pagebreak\n")
+  cat("## ", paste0("**Appendix Table ", num_table, ":** ", captions[ii,] |> pull("caption")))
+  cat("\n")
+  tab <- flextable::flextable_to_rmd(
+    tab.ii |> 
+      fxTable(
+        groupNameCol = "Covariate", groupNameAsColumn = TRUE,
+        groupOrder = c(
+          "Number records", "Age (Years)", "Age Group", "Gestational Trimester",  
+          "Vaccine Product", "Previous Pregnancies", "Healthcare Visits (Past Year)", 
+          "Days of Prior Observation",  
+          "COVID-19 Infection (Any Time Prior)", "Other Vaccinations (Any Time Prior)",
+          "Comorbidities (Any Time Prior)",  
+          "Medications Prescribed (Last 180 Days)"  
+        ),
+        style = list(
+          "header" = list(
+            "cell" = officer::fp_cell(background.color = "#c8c8c8"),
+            "text" = officer::fp_text(bold = TRUE)
+          ),
+          "header_name" = list(
+            "cell" = officer::fp_cell(background.color = "#d9d9d9"),
+            "text" = officer::fp_text(bold = TRUE)
+          ),
+          "header_level" = list(
+            "cell" = officer::fp_cell(background.color = "#e1e1e1"),
+            "text" = officer::fp_text(bold = TRUE)
+          ),
+          "column_name" = list(
+            "cell" = officer::fp_cell(background.color = "#e1e1e1"),
+            "text" = officer::fp_text(bold = TRUE)
+          ),
+          "group_label" = list(
+            "cell" = officer::fp_cell(
+              border = officer::fp_border(color = "gray")
+            ),
+            "text" = officer::fp_text(bold = TRUE)
+          ),
+          "title" = list(
+            "text" = officer::fp_text(bold = TRUE, font.size = 15)
+          ),
+          "subtitle" = list(
+            "text" = officer::fp_text(bold = TRUE, font.size = 12)
+          ),
+          "body" = list()
+        )
+      ) |>
+      flextable::set_table_properties(width = 1, layout = "autofit") 
+  )
+  num_table <- num_table + 1
+  cat("\n")
+}
+```
+
+
+```{r}
+# CENSORING ----
+censoring <- data$censoring |>
+  filter(
+    .data$`Covid definition` == "diagnostic_test", 
+    .data$`Follow-up end` == "pregnancy_end",
+    .data$Reason != "Overall",
+  ) |>
+  mutate(
+    Cohort = if_else(grepl("- unexposed", Reason), "Unexposed", "Exposed"),
+    Reason = gsub(" -(.*)", "", Reason),
+    Reason = case_when(
+      Reason == "Exposed 3rd dose" & Cohort == "Exposed" ~ "Next COVID-19 vaccine dose",
+      Reason == "Exposed 3rd dose" & Cohort == "Unexposed" ~ "Pair matched next COVID-19 vaccine dose",
+      Reason == "Unexposed 1st dose" & Cohort == "Exposed" ~ "Pair matched next COVID-19 vaccine dose",
+      Reason == "Unexposed 1st dose" & Cohort == "Unexposed" ~ "Next COVID-19 vaccine dose",
+      Reason == "No second dose; unexposed 1st dose" ~ "Unexposed 1st dose; no second dose",
+      Reason == "Exposed 4th dose" & Cohort == "Exposed" ~ "Next COVID-19 vaccine dose",
+      Reason == "Exposed 4th dose" & Cohort == "Unexposed"  ~ "Pair matched next COVID-19 vaccine dose",
+      Reason == "Unexposed 3rd dose" & Cohort == "Exposed" ~ "Pair matched next COVID-19 vaccine dose",
+      Reason == "Unexposed 3rd dose" & Cohort == "Unexposed"  ~ "Next COVID-19 vaccine dose",
+      .default = Reason
+    ),
+    Reason = factor(
+      Reason, levels = c(
+        "End of pregnancy", "Next COVID-19 vaccine dose", "Pair matched next COVID-19 vaccine dose",
+        "No second dose", "Second dose before recommended time", "Second dose after recommended time",
+        "Second dose after recommended time; unexposed 1st dose" , "Unexposed 1st dose; no second dose",
+        "Second dose before recommended time; unexposed 1st dose", "Exposed 3rd dose; unexposed 1st dose",
+        "Unexposed 1st dose; second dose after recommended time"
+      )
+    ),
+    `Median (Q25-Q75)` = if_else(is.na(N), "-", .data$`Median (Q25-Q75)`),
+    N = if_else(is.na(N), "<5", N),
+    "CDM name" = if_else(`CDM name` == "UiO Algorithm", "UiO", toupper(`CDM name`))
+  ) 
+
+captions <- expand_grid(
+  "CDM name" = c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO"),
+  "Comparison" = c("none_first", "complete_booster")
+) |>
+  mutate(
+    caption = paste0("Additional information on follow-up and reasons for censoring. ", `CDM name`, " database, for the ", Comparison, " analysis."),
+    caption = if_else(
+      Comparison == "complete_booster",
+      gsub("complete_booster", "Booster vs. Primary Vaccination Schema", caption),
+      gsub("none_first", "Primary Vaccination Schema vs. Unvaccinated", caption)
+    )
+  )
+
+for (ii in 1:nrow(captions)) {
+  # display
+  cat("\n\n\\pagebreak\n")
+  cat("## ", paste0("**Appendix Table ", num_table, ":** ", captions[ii,] |> pull("caption")))
+  cat("\n")
+  
+  censoring |>
+    inner_join(captions[ii,] |> select(!caption), by = c("CDM name", "Comparison")) |>
+    select(Cohort, Reason, N, `Median (Q25-Q75)`) |>
+    distinct() |>
+    arrange(Reason) |>
+    fxTable(
+      style = list(
+        "header" = list(
+          "cell" = officer::fp_cell(background.color = "#c8c8c8"),
+          "text" = officer::fp_text(bold = TRUE)
+        ),
+        "header_name" = list(
+          "cell" = officer::fp_cell(background.color = "#d9d9d9"),
+          "text" = officer::fp_text(bold = TRUE)
+        ),
+        "header_level" = list(
+          "cell" = officer::fp_cell(background.color = "#e1e1e1"),
+          "text" = officer::fp_text(bold = TRUE)
+        ),
+        "column_name" = list(
+          "cell" = officer::fp_cell(background.color = "#e1e1e1"),
+          "text" = officer::fp_text(bold = TRUE)
+        ),
+        "group_label" = list(
+          "cell" = officer::fp_cell(
+            border = officer::fp_border(color = "gray")
+          ),
+          "text" = officer::fp_text(bold = TRUE)
+        ),
+        "title" = list(
+          "text" = officer::fp_text(bold = TRUE, font.size = 15)
+        ),
+        "subtitle" = list(
+          "text" = officer::fp_text(bold = TRUE, font.size = 12)
+        ),
+        "body" = list()
+      ),
+      groupNameCol = "Cohort", 
+      groupNameAsColumn = TRUE
+    ) |>
+    flextable::set_table_properties(width = 1, layout = "autofit") |>
+    flextable::flextable_to_rmd()
+  num_table <- num_table + 1
+  cat("\n")
+}
+```
+
+```{r}
+#| fig-align: center
+#| fig-width: 9
+#| fig-asp: 0.5
+#| out-width: "100%"
+#| fig-dpi: 500
+#| fig.retina: 2
+
+# INDEX DATES ----
+cat("\n\n\\pagebreak\n")
+cat("## ", paste0("**Appendix Figure ", num_figure, ":** Distribution of index dates (enrollment date) across all databases and analyses."))
+cat("\n")
+num_figure <- num_figure + 1
+data$index_date |>
+  mutate(
+    cdm_name = if_else(cdm_name == "UiO Algorithm", "UiO", toupper(cdm_name))
+  ) |>
+  filter(
+    strata_name == "overall", covid_definition == "diagnostic_test", 
+    cdm_name %in% c("SCIFI-PEARL", "UiO", "SIDIAP", "CPRD GOLD")
+  ) |>
+  mutate(
+    comparison = factor(
+      comparison, levels = c("none_first", "complete_booster"),
+      labels = c("Primary Vaccination Schema vs. Unvaccinated", "Booster vs. Primary Vaccination Schema")
+    ),
+    cdm_name = factor(
+      cdm_name, levels = c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO")
+    ),
+    index_date = lubridate::floor_date(index_date, unit = "weeks"),
+    Analysis = comparison
+  ) |>
+  splitStrata() |>
+  group_by(cdm_name, Analysis, index_date) |>
+  summarise(counts = sum(counts), .groups = "drop") |>
+  arrange(cdm_name, Analysis) |>
+  ggplot(aes(x = index_date, y = counts, color = Analysis)) +
+  geom_line(linewidth = 0.85) +
+  facet_grid(rows = vars(cdm_name), scales = "free_y") +
+  scale_x_date(date_labels = "%b, %Y", date_breaks = "2 month") +
+  xlab("Index Date") +
+  ylab("Enolled pregnant women (N)") +
+  scale_colour_manual(values = c("#0072B2", "#E69F00")) +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+```{r}
+#| fig-align: center
+#| fig-width: 15
+#| fig-asp: 0.4
+#| out-width: "100%"
+#| fig-dpi: 500
+
+# HR VACCINE BRAND MAIN ----
+cat("\n\n\\pagebreak\n")
+cat("## ", paste0("**Appendix Figure ", num_figure, ":** Hazard Ratios for COVID-19 Infection and Hospitalisation (Primary Vaccination Schema vs. Unvaccinated, and Booster vs. Primary Vaccination Schema) stratified by vaccine brand."))
+num_figure <- num_figure + 1
+cat("\n")
+vaxProduct <- data$risk |>
+  mutate(cdm_name = if_else(cdm_name == "UiO Algorithm", "UiO", toupper(cdm_name))) |>
+  filter(
+    strata_name == "vaccine_brand", covid_definition == "diagnostic_test", 
+    cdm_name %in% c("SCIFI-PEARL", "UiO", "SIDIAP", "CPRD GOLD", "META-ANALYSIS"),
+    regression == "cox-sandwich", followup_end == "cohort_end_date_pregnancy",
+    delivery_excluded %in% c("yes", "-"), variable_name == "study", outcome != "icu_covid",
+    window == "15_Inf"
+  ) |>
+  splitStrata() |>
+  pivot_wider(names_from = "estimate_name", values_from = "estimate_value") |>
+  mutate(
+    vaccine_brand = factor(vaccine_brand, levels = c("pfizer", "moderna"), labels = c("Pfizer", "Moderna")),
+    Database = factor(cdm_name, levels = rev(c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "META-ANALYSIS")),
+                      labels = rev(c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "Meta-Analysis"))),
+    meta = grepl("Meta", Database),
+    Hetereogeneity = if_else(i2<=0.4 | is.na(i2) , "i2 <= 0.4", "i2>0.4"),
+    outcome = factor(
+      outcome, levels = c("covid", "inpatient_covid"), labels = c("COVID-19 infection", "COVID-19-related hospitalisation")
+    ),
+    comparison = factor(
+      comparison, levels = c("none_first", "complete_booster"),
+      labels = c("Primary Vaccination Schema vs. Unvaccinated", "Booster vs. Primary Vaccination Schema")
+    )
+  ) |>
+  arrange(Database, outcome, vaccine_brand)
+
+color.background <- "#ffffff"
+color.grid.major <- "#d9d9d9"
+color.axis.text <- "#252525"
+color.axis.title <- "#252525"
+color.border <- "#595959"
+fontsizeRef = 13
+vaxProduct |>
+  ggplot(aes(x = exp_coef, xmin = lower_ci, xmax = upper_ci, y = Database)) +
+  facet_nested(vaccine_brand ~ comparison + outcome , scales = "free_y") +
+  geom_point(aes(x = exp_coef, shape = Database, color = Database), size = 3) +
+  geom_linerange(aes(xmin = lower_ci, xmax = upper_ci, color = Database, linetype = Hetereogeneity), size = 0.8) +
+  scale_x_continuous(limits = c(0.1, 4), breaks = c(0.1, 0.25, 0.5, 1, 2, 4), trans = "log10",
+                     oob=scales::rescale_none) +
+  geom_vline(xintercept = 1)  +
+  geom_rect(aes(xmin = 0.01, xmax = 10, ymin = 0.5, ymax = 1.5),
+            fill = "#001427",
+            alpha = 0.02,
+            color = "#eaf4f4",
+            linetype = 0) +
+  ggplot2::theme_bw() +
+  ggplot2::theme(
+    # facet
+    strip.text = ggplot2::element_text(face = "bold", size = fontsizeRef-1),
+    strip.background = ggplot2::element_rect(fill = "#e5e6e4", colour = color.border),
+    strip.switch.pad.grid = unit(10, "cm"),
+    # # title
+    plot.title = ggplot2::element_text(face = "bold", size = fontsizeRef+2),
+    # axis
+    axis.text.y = ggtext::element_markdown(size = fontsizeRef-1, color = color.axis.text),
+    axis.text.x = ggplot2::element_text(size = fontsizeRef-1, color = color.axis.text),
+    axis.title.x = ggplot2::element_text(size = fontsizeRef, vjust = 0, color = color.axis.title),
+    axis.title.y = ggplot2::element_text(size = fontsizeRef, vjust = 1.25, color = color.axis.title),
+    # legend
+    legend.text = ggplot2::element_text(size = fontsizeRef-1),
+    legend.title = ggplot2::element_text(size = fontsizeRef),
+    # background
+    panel.background = ggplot2::element_rect(fill = color.background, colour = color.background),
+    plot.background = ggplot2::element_rect(fill = color.background, colour = color.background),
+    panel.border = ggplot2::element_rect(colour = color.border),
+    # grid
+    panel.grid.major = ggplot2::element_line(color = color.grid.major, size = .25),
+    panel.spacing = unit(1, "lines"),
+    # margin
+    plot.margin = grid::unit(c(0.35, 0.2, 0.3, 0.35), "cm")
+  ) +
+  scale_color_manual(values = c("#1b263b", "#778da9","#778da9", "#778da9", "#778da9")) +
+  scale_linetype_manual(values = c("solid", "dashed"), labels = unname(TeX(c("$i^2 <= 0.4$", "$i^2 > 0.4$")))) +
+  # scale_y_discrete(labels = rev(c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "**Meta-Analysis**"))) +
+  scale_shape_manual(values = c(15, 16, 17, 18, 8)) +
+  xlab("Hazard Ratio") +
+  ylab("")
+```
+
+```{r}
+#| fig-align: center
+#| fig-width: 15
+#| fig-asp: 0.5
+#| out-width: "100%"
+#| fig-dpi: 500
+
+# KAPLAN - MEIER ----
+kaplanMeier <- data$kaplan_meier |>
+  mutate(cdm_name = if_else(cdm_name == "UiO Algorithm", "UiO", toupper(cdm_name))) |>
+  filter(
+    strata_name == "overall", covid_definition == "diagnostic_test", 
+    cdm_name %in% c("SCIFI-PEARL", "UiO", "SIDIAP", "CPRD GOLD", "META-ANALYSIS"),
+    followup_end == "cohort_end_date_pregnancy",
+    delivery_excluded %in% c("yes", "-"), outcome != "icu_covid"
+  ) |>
+  mutate(
+    Database = factor(cdm_name, levels = rev(c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "META-ANALYSIS")),
+                      labels = rev(c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "Meta-Analysis"))),
+    outcome = factor(
+      outcome, levels = c("covid", "inpatient_covid"), labels = c("COVID-19 infection", "COVID-19-related hospitalisation")
+    ),
+    Comparison = factor(
+      comparison, levels = c("none_first", "complete_booster"),
+      labels = c("Primary Vaccination Schema vs. Unvaccinated", "Booster vs. Primary Vaccination Schema")
+    )
+  ) |>
+  arrange(Database, Comparison, outcome)
+
+cat("\n\n\\pagebreak\n")
+cat("## ", paste0("**Appendix Figure ", num_figure, ":** Kaplan-Meier curves for COVID-19 infection, across databases, and analysis"))
+num_figure <- num_figure + 1
+cat("\n")
+kaplanMeier |>
+  filter(outcome == "COVID-19 infection") |>
+  ggplot(aes(x = time, y = estimate, color = Cohort, fill = Cohort, ymin = estimate_95CI_lower, ymax = estimate_95CI_upper)) +
+  geom_step(size = 1) +
+  geom_ribbon(alpha = 0.3, colour = NA) +
+  scale_color_manual(values = c("#87b38d", "#0d3b66")) +
+  scale_fill_manual(values = c("#87b38d", "#0d3b66")) +
+  ggh4x::facet_grid2(rows = vars(cdm_name), cols = vars(Comparison), scales = "free", independent = "y") +
+  theme_bw() +
+  xlab("Time (days)") +
+  ylab("Survival probability")
+
+cat("\n\n\\pagebreak\n")
+cat("## ", paste0("**Appendix Figure ", num_figure, ":** Kaplan-Meier curves for COVID-19-related hospitalisation, across databases, and analysis"))
+num_figure <- num_figure + 1
+cat("\n")
+kaplanMeier |>
+  filter(outcome == "COVID-19-related hospitalisation") |>
+  ggplot(aes(x = time, y = estimate, color = Cohort, fill = Cohort, ymin = estimate_95CI_lower, ymax = estimate_95CI_upper)) +
+  geom_step(size = 1) +
+  geom_ribbon(alpha = 0.3, colour = NA) +
+  scale_color_manual(values = c("#87b38d", "#0d3b66")) +
+  scale_fill_manual(values = c("#87b38d", "#0d3b66")) +
+  ggh4x::facet_grid2(rows = vars(cdm_name), cols = vars(Comparison), scales = "free", independent = "y") +
+  theme_bw() +
+  xlab("Time (days)") +
+  ylab("Survival probability")
+
+cat("\n\n\\pagebreak\n")
+cat("## ", paste0("**Appendix Figure ", num_figure, ":** Log-Log plots for COVID-19 infection, across databases, and analysis"))
+num_figure <- num_figure + 1
+cat("\n")
+kaplanMeier |>
+  filter(outcome == "COVID-19 infection") |>
+  mutate(estimate = log(-log(estimate))) |>
+  ggplot(aes(x = time, y = estimate, color = Cohort, fill = Cohort, ymin = estimate_95CI_lower, ymax = estimate_95CI_upper)) +
+  geom_step(size = 1) +
+  scale_color_manual(values = c("#87b38d", "#0d3b66")) +
+  scale_fill_manual(values = c("#87b38d", "#0d3b66")) +
+  scale_x_continuous(trans='log10') +
+  theme_bw() +
+  ggh4x::facet_grid2(rows = vars(cdm_name), cols = vars(Comparison), scales = "free", independent = "y") +
+  xlab("Time (days)") +
+  ylab("log(-log(S(t)))")
+
+cat("\n\n\\pagebreak\n")
+cat("## ", paste0("**Appendix Figure ", num_figure, ":** Log-Log plots for COVID-19-related hospitalisation, across databases, and analysis"))
+num_figure <- num_figure + 1
+cat("\n")
+kaplanMeier |>
+  filter(outcome == "COVID-19-related hospitalisation") |>
+  mutate(estimate = log(-log(estimate))) |>
+  ggplot(aes(x = time, y = estimate, color = Cohort, fill = Cohort, ymin = estimate_95CI_lower, ymax = estimate_95CI_upper)) +
+  geom_step(size = 1) +
+  scale_color_manual(values = c("#87b38d", "#0d3b66")) +
+  scale_fill_manual(values = c("#87b38d", "#0d3b66")) +
+  scale_x_continuous(trans='log10') +
+  theme_bw() +
+  ggh4x::facet_grid2(rows = vars(cdm_name), cols = vars(Comparison), scales = "free", independent = "y") +
+  xlab("Time (days)") +
+  ylab("log(-log(S(t)))")
+```
+
+```{r}
+#| fig-align: center
+#| fig-width: 15
+#| fig-asp: 0.3
+#| out-width: "100%"
+#| fig-dpi: 500
+
+cat("\n\n\\pagebreak\n")
+cat("## ", paste0("**Appendix Figure ", num_figure, ":** Meta-Analysed Hazard Ratio estimates against COVID-19 infection and COVID-19 related hospitalisation across different time-windows post-vaccination."))
+num_figure <- num_figure + 1
+cat("\n")
+
+# HR by time windows ----
+windows <- c("0_14", "15_28", "29_90", "91_180", "181_365")
+x_breaks = rev(1:length(windows))
+dataHR <- data$risk %>%
+  mutate(cdm_name = if_else(cdm_name == "UiO Algorithm", "UiO", toupper(cdm_name))) |>
+  filter(variable_name == "study") %>%
+  filter(strata_level == "overall") |>
+  filter(cdm_name %in% c("META-ANALYSIS")) |>
+  filter(covid_definition == "diagnostic_test") |>
+  filter(followup_end == "cohort_end_date_pregnancy") |>
+  filter(regression %in% c("cox-sandwich")) |>
+  filter(outcome %in% c("covid", "inpatient_covid")) |>
+  filter(delivery_excluded %in% c("-", "yes")) |>
+  filter(window %in% windows) |>
+  inner_join(tibble(x_breaks = x_breaks, window = windows))  |>
+  mutate(
+    comparison = factor(
+      comparison,
+      level = c("none_first", "complete_booster"),
+      labels = c("Primary Vaccination Schema vs.\n Unvaccinated", "Booster vs. \n  Primary Vaccination Schema")
+    ),
+    # cdm_name = factor(
+    #   cdm_name,
+    #   level = c("SCIFI-PEARL", "UiO", "SIDIAP", "CPRD GOLD", "META-ANALYSIS"),
+    #   labels = c("SCIFI-PEARL", "UiO", "SIDIAP", "CPRD GOLD", "META-ANALYSIS")
+    # ),
+    window = factor(
+      window,
+      levels = windows,
+      labels = paste0(gsub("_", " to ", windows), " days")
+    ),
+    Outcome = factor(outcome,
+                     levels = c("covid", "inpatient_covid"),
+                     labels = c("SARS-CoV-2 infection", "COVID-19 related hospitalisation")),
+    x_breaks = if_else(outcome == "inpatient_covid", x_breaks-0.15, x_breaks+0.15),
+    "Database" = cdm_name
+  ) |>
+  arrange(cdm_name, comparison, window) |>
+  pivot_wider(names_from = "estimate_name", values_from = "estimate_value")
+
+dataHR |>
+  ggplot(aes(y = x_breaks, color = Outcome)) +
+  geom_point(aes(x = exp_coef), size = 3) +
+  geom_linerange(aes(xmin = lower_ci, xmax = upper_ci), size = 1) +
+  scale_y_continuous(breaks = x_breaks, labels = dataHR$window |> levels(),
+                     limits = c(0.5, max(dataHR$x_breaks) + 0.5) ) +
+  scale_x_continuous(limits = c(0.1, 4), breaks = c(0.1, 0.25, 0.5, 1, 2, 4), trans = "log",
+                     oob=scales::rescale_none) +
+  geom_vline(xintercept = 1) +
+  facet_grid(cols = vars(comparison)) +
+  scale_color_manual(values = c("#0d3b66", "#87b38d", "#ACD98DFF", "#B85A0DFF", "#B85A0DFF")) +
+  ggplot2::theme_bw() +
+  ggplot2::theme(
+    # facet
+    strip.text = ggplot2::element_text(face = "bold", size = fontsizeRef-1),
+    strip.background = ggplot2::element_rect(fill = "#e5e6e4", colour = color.border),
+    strip.switch.pad.grid = unit(10, "cm"),
+    # # title
+    plot.title = ggplot2::element_text(face = "bold", size = fontsizeRef+2),
+    # axis
+    axis.text.y = ggtext::element_markdown(size = fontsizeRef-1, color = color.axis.text),
+    axis.text.x = ggplot2::element_text(size = fontsizeRef-1, color = color.axis.text),
+    axis.title.x = ggplot2::element_text(size = fontsizeRef, vjust = 0, color = color.axis.title),
+    axis.title.y = ggplot2::element_text(size = fontsizeRef, vjust = 1.25, color = color.axis.title),
+    # legend
+    legend.text = ggplot2::element_text(size = fontsizeRef-1),
+    legend.title = ggplot2::element_text(size = fontsizeRef),
+    # background
+    panel.background = ggplot2::element_rect(fill = color.background, colour = color.background),
+    plot.background = ggplot2::element_rect(fill = color.background, colour = color.background),
+    panel.border = ggplot2::element_rect(colour = color.border),
+    # grid
+    panel.grid.major = ggplot2::element_line(color = color.grid.major, size = .25),
+    panel.spacing = unit(1, "lines"),
+    # margin
+    plot.margin = grid::unit(c(0.35, 0.2, 0.3, 0.35), "cm")
+  ) +
+  ylab("Time-windows") +
+  xlab("Hazard Ratios")
+```
+
+```{r}
+#| fig-align: center
+#| fig-width: 15
+#| fig-asp: 0.6
+#| out-width: "100%"
+#| fig-dpi: 500
+
+# NCO ----
+nco <- data$risk |>
+    mutate(cdm_name = if_else(cdm_name == "UiO Algorithm", "UiO", toupper(cdm_name))) |>
+    filter(
+        strata_name == "overall", covid_definition == "diagnostic_test", 
+        cdm_name %in% c("SCIFI-PEARL", "UiO", "SIDIAP", "CPRD GOLD", "META-ANALYSIS"),
+        regression == "cox-sandwich", followup_end == "cohort_end_date_pregnancy",  
+        variable_name == "nco"
+    ) |>
+    splitStrata() |>
+    pivot_wider(names_from = "estimate_name", values_from = "estimate_value") |>
+    mutate(
+        Database = factor(cdm_name, levels = rev(c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "META-ANALYSIS")),
+                          labels = rev(c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "META-ANALYSIS"))),
+        comparison = factor(
+            comparison, levels = c("none_first", "complete_booster"),
+            labels = c("Primary Vaccination Schema vs. Unvaccinated", "Booster vs. Primary Vaccination Schema")
+        ),
+        Outcome = stringr::str_to_sentence(gsub("_", " ", outcome)),
+        Association = case_when(
+          lower_ci > 1 ~ "Positive association",
+          upper_ci < 1 ~ "Negative association",
+          lower_ci <= 1 & upper_ci >= 1 ~ "No association",
+          .default = "No association"
+        )
+    ) |>
+    arrange(Database, comparison)
+
+for (cdm in c("SCIFI-PEARL", "UiO", "SIDIAP", "CPRD GOLD")) {
+  cat("\n\n\\pagebreak\n")
+  cat("## ", paste0("**Appendix Figure ", num_figure, ":** Negative Control Outcomes results for ", cdm, " database."))
+  num_figure <- num_figure + 1
+  cat("\n")
+  g <- nco |>
+    filter(cdm_name %in% cdm) |>
+    ggplot(aes(x = exp_coef, y = Outcome, color = Association)) +
+    geom_vline(xintercept = 1) +
+    geom_point() +
+    geom_linerange(aes(xmin = lower_ci, xmax = upper_ci), linewidth = 0.8) +
+    scale_x_continuous(breaks = c(0.1, 0.25, 0.5, 1, 2, 4),
+                       labels = c(0.1, 0.25, 0.5, 1, 2, 4),
+                       limits = c(0.1, 4),
+                       trans = "log10",
+                       oob = scales::rescale_none) +
+    facet_grid(cols = vars(comparison)) +
+    ylab("") +
+    xlab("Hazard Ratio") 
+  print(g)
+}
+```
+
+```{r}
+#| fig-align: center
+#| fig-width: 15
+#| fig-asp: 0.3
+#| out-width: "100%"
+#| fig-dpi: 500
+## SECONDARY ----
+# Main figures for secondary ----
+cdmMain <- c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "META-ANALYSIS")
+estimates <- data$risk |>
+  mutate(cdm_name = if_else(cdm_name == "UiO Algorithm", "UiO", toupper(cdm_name))) |>
+  pivot_wider(names_from = "estimate_name", values_from = "estimate_value") |>
+  filter(
+    cdm_name %in% cdmMain,
+    covid_definition == "diagnostic_test",
+    regression == "cox-sandwich",
+    followup_end == "cohort_end_date",
+    variable_name == "study",
+    delivery_excluded %in% c("-", "yes"),
+    window == "15_Inf",
+    outcome != "icu_covid",
+    !(cdm_name == "CPRD GOLD" & outcome == "inpatient_covid")
+  ) |>
+  select(!estimate_type) |>
+  left_join(
+    data$survival_summary |>
+      mutate(cdm_name = if_else(cdm_name == "UiO Algorithm", "UiO", toupper(cdm_name))) |>
+      filter(grepl("count", estimate_name)) |>
+      select(!estimate_type) |>
+      pivot_wider(names_from = c("exposed", "estimate_name"), values_from = "estimate_value") |>
+      union_all(
+        data$survival_summary |>
+          filter(grepl("count", estimate_name)) |>
+          select(!estimate_type) |>
+          pivot_wider(names_from = c("exposed", "estimate_name"), values_from = "estimate_value") |>
+          group_by(
+            comparison, covid_definition, strata_name, strata_level, window, followup_end,
+            exposed_censoring, variable_name, outcome, delivery_excluded
+          ) |>
+          summarise(
+            unexposed_count = sum(unexposed_count, na.rm = TRUE), 
+            exposed_count = sum(exposed_count, na.rm = TRUE),
+            unexposed_count_events = sum(unexposed_count_events, na.rm = TRUE), 
+            exposed_count_events = sum(exposed_count_events, na.rm = TRUE), 
+            .groups = "drop"
+          ) |>
+          mutate(cdm_name = "META-ANALYSIS")
+      )
+  ) |>
+  mutate(
+    comparison = factor(
+      comparison, levels = c("none_first", "complete_booster"),
+      labels = c("Primary Vaccination Schema vs. Unvaccinated", "Booster vs. Primary Vaccination Schema")
+    ),
+    cdm_name = factor(
+      cdm_name, levels = c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "META-ANALYSIS")
+    ),
+    outcome = factor(
+      outcome, levels = c("covid", "inpatient_covid"), labels = c("COVID-19 infection", "COVID-19-related hospitalisation")
+    ),
+    across(
+      all_of(c("coef", "se_coef", "exp_coef", "z", "p", "lower_ci", "upper_ci", "i2")),
+      ~ if_else(is.na(unexposed_count) | is.na(exposed_count) | is.na(unexposed_count_events) | is.na(exposed_count_events), NA, .x)
+    ),
+    unexposed_count_events = if_else(
+      is.na(unexposed_count_events), "<5",
+      paste0(
+        niceNum(unexposed_count_events), " (", niceNum((unexposed_count_events/unexposed_count)*100, dec = 2),"%)"
+      )
+    ),
+    exposed_count_events = if_else(
+      is.na(exposed_count_events), "<5",
+      paste0(
+        niceNum(exposed_count_events), " (", niceNum((exposed_count_events/exposed_count)*100, dec = 2),"%)"
+      )
+    ),
+    across(
+      all_of(c("unexposed_count", "exposed_count")),
+      ~ if_else(is.na(.x), "<5", as.character(niceNum(.x)))
+    ),
+    `HR (95% CI)` = if_else(
+      !is.na(exp_coef), sprintf("   %.2f (%.2f - %.2f)", exp_coef, lower_ci, upper_ci), ""
+    ),
+    "VE" =  if_else(
+      !is.na(exp_coef), paste0(niceNum((1-exp_coef)*100, dec = 2), "%"), ""
+    )
+  ) |>
+  select(!c("covid_definition", "exposed_censoring", "followup_end", "window", "variable_name", "delivery_excluded", "regression")) |>
+  rename(
+    "Database" = "cdm_name"
+  )
+
+comparisonNms <- c("Primary Vaccination Schema vs. Unvaccinated", "Booster vs. Primary Vaccination Schema")
+for (ii in 1:2) {
+  cat("\n\n\\pagebreak\n")
+  cat("## ", paste0("**Appendix Figure ", num_figure, ":** Vaccine effectiveness estimates for ", comparisonNms[ii], ", when follow-up is not stopped at pregnancy end date."))
+  num_figure <- num_figure + 1
+  cat("\n")
+  fig1 <- estimates |>
+    filter(comparison == comparisonNms[ii], strata_name == "overall") |>
+    select(!starts_with("strata")) |>
+    arrange(outcome, Database) |>
+    mutate(
+      Database = paste0("      ", Database)
+      , " " = "                         ",
+      "  " = " ",
+      i2 = as.character(round(i2,4))
+    ) |>
+    select(outcome, Database, starts_with("exposed"), "  ", starts_with("unexposed"), " ",
+           starts_with("HR"), "VE", "i2", "exp_coef", "lower_ci", "upper_ci", "se_coef")
+
+  fig1 <- bind_rows(
+    tibble(Database = "COVID-19 infection"),
+    fig1[fig1$outcome == "COVID-19 infection", 2:15],
+    tibble(Database = ""),
+    tibble(Database = "COVID-19-related hospitalisation"),
+    fig1[fig1$outcome == "COVID-19-related hospitalisation", 2:15]
+  ) |>
+    mutate(across(any_of(colnames(fig1[,1:9])), ~if_else(is.na(.x), "", .x)))
+
+  thm <- forest_theme(
+    base_size = 11,
+    base_family = "",
+    ci_pch = 15,
+    ci_col = "black",
+    ci_alpha = 1,
+    ci_fill = NULL,
+    ci_lty = 1,
+    ci_lwd = 1,
+    ci_Theight = NULL,
+    legend_name = "Group",
+    legend_position = "right",
+    legend_value = "",
+    vertline_lwd = 1,
+    vertline_lty = "dashed",
+    vertline_col = "red",
+    summary_col = "#4575b4",
+    footnote_parse = TRUE,
+    title_just = c("center"),
+    arrow_type = c("open", "closed"),
+    arrow_label_just = c("start", "end"),
+    arrow_length = 0.05,
+    padding = unit(100, "mm")
+  )
+
+  fig1Forestploter <- fig1[,1:10]
+  colnames(fig1Forestploter) <- c(
+    "", "Population (N)", "Events (N(%))", " ", "Population (N)", "Events (N(%))", " ", " ", "VE", "i2"
+  )
+  fig1Forestploter[is.na(fig1Forestploter)] <- ""
+
+  p <- forest(
+    fig1Forestploter,
+    est = fig1$exp_coef,
+    lower = fig1$lower_ci,
+    upper = fig1$upper_ci,
+    sizes = 0.5,
+    x_trans = "log10",
+    ref_line = 1,
+    vert_line = NULL,
+    ci_column = 7,
+    is_summary = c(rep(FALSE, 5), TRUE, rep(FALSE, 5), TRUE),
+    xlim = NULL,
+    ticks_at = NULL,
+    ticks_digits = NULL,
+    ticks_minor = NULL,
+    arrow_lab = NULL,
+    footnote = NULL,
+    title = NULL,
+    nudge_y = 0,
+    fn_ci = makeci,
+    fn_summary = make_summary,
+    index_args = NULL,
+    theme = thm,
+    graphwidth = unit(5, "cm")
+  ) |>
+    # HR header
+    add_text(text = "HR (95% CI)",
+             part = "header",
+             col = 7:8,
+             gp = gpar(fontface = "bold")) |>
+    add_text(text = "Exposed",
+             part = "header",
+             row = 0,
+             col = 2:3,
+             gp = gpar(fontface = "bold")) |>
+    add_text(text = "Unexposed",
+             part = "header",
+             row = 0,
+             col = 5:6,
+             gp = gpar(fontface = "bold")) |>
+    add_text(text = "Database",
+             part = "header",
+             row = 1,
+             col = 1,
+             gp = gpar(fontface = "bold"),
+             just = c("left")) |>
+    add_border(part = "header",
+               row = 0,
+               col = 2:3,
+               gp = gpar(lwd = 0.3, alpha = 0.5)) |>
+    add_border(part = "header",
+               row = 0,
+               col = 5:6,
+               gp = gpar(lwd = 0.3, alpha = 0.5)) |>
+    add_border(part = "body",
+               row = c(1, 8),
+               where = c("bottom"),
+               gp = gpar(lwd = 1)) |>
+    add_border(part = "body",
+               row = c(1, 8),
+               where = c("top"),
+               gp = gpar(lwd = 1)) |>
+    edit_plot(col = 1, row = c(1, 8),
+              which = "text",
+              gp = gpar(fontface = "bold", fontsize = 12)) |>
+    edit_plot(row = c(6, 12),
+              which = "text",
+              gp = gpar(fontface = "bold")) |>
+    edit_plot(which = "background",
+              gp = gpar(fill = "#ffffff")) |>
+    edit_plot(row = c(2, 4, 6, 9, 11),
+              which = "background",
+              gp = gpar(fill = "#778da9", alpha = 0.1)) |>
+    edit_plot(row = c(1, 8),
+              which = "background",
+              gp = gpar(fill = "#778da9", alpha = 0.3)) |>
+    edit_plot(col = 7, row = c(6, 12), which = "ci",
+              gp = gpar(col = "#415a77", fill = "#415a77"))
+  print(p)
+}
+
+```
+
+```{r}
+#| fig-align: center
+#| fig-width: 16
+#| fig-asp: 0.4
+#| out-width: "100%"
+#| fig-dpi: 500
+# By trimester, secondary ----
+cat("\n\n\\pagebreak\n")
+cat("## ", paste0("**Appendix Figure ", num_figure, ":** Hazard Ratios for COVID-19 Infection and Hospitalisation (Primary Vaccination Schema vs. Unvaccinated, and Booster vs. Primary Vaccination Schema) stratified by pregnancy trimester at time of vaccination, when follow-up is not stopped at pregnancy end date."))
+num_figure <- num_figure + 1
+cat("\n")
+fig2 <- estimates |>
+  filter(strata_name == "trimester") |>
+  splitStrata() |>
+  mutate(
+    trimester = factor(trimester, levels = c("T1", "T2", "T3"), labels = paste0("Trimester ", 1:3)),
+    Database = factor(Database,
+                      levels = rev(cdmMain)),
+    meta = grepl("Meta", Database),
+    Hetereogeneity = if_else(i2<=0.4 | is.na(i2) , "i2 <= 0.4", "i2>0.4")
+  ) |>
+  arrange(outcome, trimester, Database)
+
+color.background <- "#ffffff"
+color.grid.major <- "#d9d9d9"
+color.axis.text <- "#252525"
+color.axis.title <- "#252525"
+color.border <- "#595959"
+fontsizeRef = 13
+ggplot(fig2, aes(x = exp_coef, xmin = lower_ci, xmax = upper_ci, y = Database)) +
+  facet_nested(trimester ~ comparison + outcome , scales = "free_y") +
+  geom_point(aes(x = exp_coef, shape = Database, color = Database), size = 3) +
+  geom_linerange(aes(xmin = lower_ci, xmax = upper_ci, color = Database, linetype = Hetereogeneity), size = 0.8) +
+  scale_x_continuous(limits = c(0.07, 4), breaks = c(0.1, 0.25, 0.5, 1, 2, 4), trans = "log10",
+                     oob=scales::rescale_none) +
+  geom_vline(xintercept = 1)  +
+  geom_rect(aes(xmin = 0.01, xmax = 10, ymin = 0.5, ymax = 1.5),
+            fill = "#001427",
+            alpha = 0.02,
+            color = "#eaf4f4",
+            linetype = 0) +
+  ggplot2::theme_bw() +
+  ggplot2::theme(
+    # facet
+    strip.text = ggplot2::element_text(face = "bold", size = fontsizeRef-1),
+    strip.background = ggplot2::element_rect(fill = "#e5e6e4", colour = color.border),
+    strip.switch.pad.grid = unit(10, "cm"),
+    # # title
+    plot.title = ggplot2::element_text(face = "bold", size = fontsizeRef+2),
+    # axis
+    axis.text.y = ggtext::element_markdown(size = fontsizeRef-1, color = color.axis.text),
+    axis.text.x = ggplot2::element_text(size = fontsizeRef-1, color = color.axis.text),
+    axis.title.x = ggplot2::element_text(size = fontsizeRef, vjust = 0, color = color.axis.title),
+    axis.title.y = ggplot2::element_text(size = fontsizeRef, vjust = 1.25, color = color.axis.title),
+    # legend
+    legend.text = ggplot2::element_text(size = fontsizeRef-1),
+    legend.title = ggplot2::element_text(size = fontsizeRef, face = "bold"),
+    # background
+    panel.background = ggplot2::element_rect(fill = color.background, colour = color.background),
+    plot.background = ggplot2::element_rect(fill = color.background, colour = color.background),
+    panel.border = ggplot2::element_rect(colour = color.border),
+    # grid
+    panel.grid.major = ggplot2::element_line(color = color.grid.major, size = .25),
+    panel.spacing = unit(1, "lines"),
+    # margin
+    plot.margin = grid::unit(c(0.35, 0.2, 0.3, 0.35), "cm")
+  ) +
+  scale_color_manual(values = c("#1b263b", "#778da9","#778da9", "#778da9", "#778da9")) +
+  scale_linetype_manual(values = c("solid", "dashed"), labels = unname(TeX(c("$i^2  <= 0.4$", "$i^2 > 0.4$")))) +
+  scale_y_discrete(labels = rev(c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "**META-ANALYSIS**"))) +
+  scale_shape_manual(values = c(15, 16, 17, 18, 8)) +
+  xlab("Hazard Ratio")
+```
+
+```{r}
+#| fig-align: center
+#| fig-width: 16
+#| fig-asp: 0.3
+#| out-width: "100%"
+#| fig-dpi: 500
+
+# by vaccine brand for secondary ----
+cat("\n\n\\pagebreak\n")
+cat("## ", paste0("**Appendix Figure ", num_figure, ":** Hazard Ratios for COVID-19 Infection and Hospitalisation (Primary Vaccination Schema vs. Unvaccinated, and Booster vs. Primary Vaccination Schema) stratified by vaccine brand, when follow-up is not stopped at pregnancy end date."))
+num_figure <- num_figure + 1
+cat("\n")
+vaxProduct <- data$risk |>
+  mutate(cdm_name = if_else(cdm_name == "UiO Algorithm", "UiO", toupper(cdm_name))) |>
+  filter(
+    strata_name == "vaccine_brand", covid_definition == "diagnostic_test", 
+    cdm_name %in% c("SCIFI-PEARL", "UiO", "SIDIAP", "CPRD GOLD", "META-ANALYSIS"),
+    regression == "cox-sandwich", followup_end == "cohort_end_date_pregnancy",
+    delivery_excluded %in% c("yes", "-"), variable_name == "study", outcome != "icu_covid",
+    window == "15_Inf"
+  ) |>
+  splitStrata() |>
+  pivot_wider(names_from = "estimate_name", values_from = "estimate_value") |>
+  mutate(
+    vaccine_brand = factor(vaccine_brand, levels = c("pfizer", "moderna"), labels = c("Pfizer", "Moderna")),
+    Database = factor(cdm_name, levels = rev(c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "META-ANALYSIS")),
+                      labels = rev(c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "Meta-Analysis"))),
+    meta = grepl("Meta", Database),
+    Hetereogeneity = if_else(i2<=0.4 | is.na(i2) , "i2 <= 0.4", "i2>0.4"),
+    outcome = factor(
+      outcome, levels = c("covid", "inpatient_covid"), labels = c("COVID-19 infection", "COVID-19-related hospitalisation")
+    ),
+    comparison = factor(
+      comparison, levels = c("none_first", "complete_booster"),
+      labels = c("Primary Vaccination Schema vs. Unvaccinated", "Booster vs. Primary Vaccination Schema")
+    )
+  ) |>
+  arrange(Database, outcome, vaccine_brand)
+
+vaxProduct |>
+  ggplot(aes(x = exp_coef, xmin = lower_ci, xmax = upper_ci, y = Database)) +
+  facet_nested(vaccine_brand ~ comparison + outcome , scales = "free_y") +
+  geom_point(aes(x = exp_coef, shape = Database, color = Database), size = 3) +
+  geom_linerange(aes(xmin = lower_ci, xmax = upper_ci, color = Database, linetype = Hetereogeneity), size = 0.8) +
+  scale_x_continuous(limits = c(0.1, 4), breaks = c(0.1, 0.25, 0.5, 1, 2, 4), trans = "log10",
+                     oob=scales::rescale_none) +
+  geom_vline(xintercept = 1)  +
+  geom_rect(aes(xmin = 0.01, xmax = 10, ymin = 0.5, ymax = 1.5),
+            fill = "#001427",
+            alpha = 0.02,
+            color = "#eaf4f4",
+            linetype = 0) +
+  ggplot2::theme_bw() +
+  ggplot2::theme(
+    # facet
+    strip.text = ggplot2::element_text(face = "bold", size = fontsizeRef-1),
+    strip.background = ggplot2::element_rect(fill = "#e5e6e4", colour = color.border),
+    strip.switch.pad.grid = unit(10, "cm"),
+    # # title
+    plot.title = ggplot2::element_text(face = "bold", size = fontsizeRef+2),
+    # axis
+    axis.text.y = ggtext::element_markdown(size = fontsizeRef-1, color = color.axis.text),
+    axis.text.x = ggplot2::element_text(size = fontsizeRef-1, color = color.axis.text),
+    axis.title.x = ggplot2::element_text(size = fontsizeRef, vjust = 0, color = color.axis.title),
+    axis.title.y = ggplot2::element_text(size = fontsizeRef, vjust = 1.25, color = color.axis.title),
+    # legend
+    legend.text = ggplot2::element_text(size = fontsizeRef-1),
+    legend.title = ggplot2::element_text(size = fontsizeRef),
+    # background
+    panel.background = ggplot2::element_rect(fill = color.background, colour = color.background),
+    plot.background = ggplot2::element_rect(fill = color.background, colour = color.background),
+    panel.border = ggplot2::element_rect(colour = color.border),
+    # grid
+    panel.grid.major = ggplot2::element_line(color = color.grid.major, size = .25),
+    panel.spacing = unit(1, "lines"),
+    # margin
+    plot.margin = grid::unit(c(0.35, 0.2, 0.3, 0.35), "cm")
+  ) +
+  scale_color_manual(values = c("#1b263b", "#778da9","#778da9", "#778da9", "#778da9")) +
+  scale_linetype_manual(values = c("solid", "dashed"), labels = unname(TeX(c("$i^2 <= 0.4$", "$i^2 > 0.4$")))) +
+  # scale_y_discrete(labels = rev(c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "**Meta-Analysis**"))) +
+  scale_shape_manual(values = c(15, 16, 17, 18, 8)) +
+  xlab("Hazard Ratio") +
+  ylab("")
+```
+
+
+```{r}
+#| fig-align: center
+#| fig-width: 15
+#| fig-asp: 0.3
+#| out-width: "100%"
+#| fig-dpi: 500
+
+## Sensitivity delivery not excluded ----
+cat("\n\n\\pagebreak\n")
+cat("## ", paste0("**Appendix Figure ", num_figure, ":** Hazard Ratios for COVID-19 related Hospitalisation (Primary Vaccination Schema vs. Unvaccinated, and Booster vs. Primary Vaccination Schema), when hospitalisation related to delivery is considered."))
+num_figure <- num_figure + 1
+cat("\n")
+hospSens <- data$risk |>
+  mutate(cdm_name = if_else(cdm_name == "UiO Algorithm", "UiO", toupper(cdm_name))) |>
+  filter(
+    strata_name == "overall", covid_definition == "diagnostic_test", 
+    cdm_name %in% c("SCIFI-PEARL", "UiO", "SIDIAP", "CPRD GOLD", "META-ANALYSIS"),
+    regression == "cox-sandwich", followup_end == "cohort_end_date_pregnancy",
+    delivery_excluded %in% c("no"), variable_name == "study", outcome == "inpatient_covid",
+    window == "15_Inf"
+  ) |>
+  splitStrata() |>
+  pivot_wider(names_from = "estimate_name", values_from = "estimate_value") |>
+  mutate(
+    Database = factor(cdm_name, levels = rev(c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "META-ANALYSIS")),
+                      labels = rev(c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "Meta-Analysis"))),
+    meta = grepl("Meta", Database),
+    Hetereogeneity = if_else(i2<=0.4 | is.na(i2) , "i2 <= 0.4", "i2>0.4"),
+    outcome = factor(
+      outcome, levels = c("inpatient_covid"), labels = c("COVID-19-related hospitalisation")
+    ),
+    comparison = factor(
+      comparison, levels = c("none_first", "complete_booster"),
+      labels = c("Primary Vaccination Schema vs. Unvaccinated", "Booster vs. Primary Vaccination Schema")
+    )
+  ) |>
+  arrange(Database, outcome)
+
+hospSens |>
+  ggplot(aes(x = exp_coef, xmin = lower_ci, xmax = upper_ci, y = Database)) +
+  facet_nested(. ~ comparison, scales = "free_y") +
+  geom_point(aes(x = exp_coef, shape = Database, color = Database), size = 3) +
+  geom_linerange(aes(xmin = lower_ci, xmax = upper_ci, color = Database, linetype = Hetereogeneity), size = 0.8) +
+  scale_x_continuous(limits = c(0.1, 4), breaks = c(0.1, 0.25, 0.5, 1, 2, 4), trans = "log10",
+                     oob=scales::rescale_none) +
+  geom_vline(xintercept = 1)  +
+  geom_rect(aes(xmin = 0.01, xmax = 10, ymin = 0.5, ymax = 1.5),
+            fill = "#001427",
+            alpha = 0.02,
+            color = "#eaf4f4",
+            linetype = 0) +
+  ggplot2::theme_bw() +
+  ggplot2::theme(
+    # facet
+    strip.text = ggplot2::element_text(face = "bold", size = fontsizeRef-1),
+    strip.background = ggplot2::element_rect(fill = "#e5e6e4", colour = color.border),
+    strip.switch.pad.grid = unit(10, "cm"),
+    # # title
+    plot.title = ggplot2::element_text(face = "bold", size = fontsizeRef+2),
+    # axis
+    axis.text.y = ggtext::element_markdown(size = fontsizeRef-1, color = color.axis.text),
+    axis.text.x = ggplot2::element_text(size = fontsizeRef-1, color = color.axis.text),
+    axis.title.x = ggplot2::element_text(size = fontsizeRef, vjust = 0, color = color.axis.title),
+    axis.title.y = ggplot2::element_text(size = fontsizeRef, vjust = 1.25, color = color.axis.title),
+    # legend
+    legend.text = ggplot2::element_text(size = fontsizeRef-1),
+    legend.title = ggplot2::element_text(size = fontsizeRef),
+    # background
+    panel.background = ggplot2::element_rect(fill = color.background, colour = color.background),
+    plot.background = ggplot2::element_rect(fill = color.background, colour = color.background),
+    panel.border = ggplot2::element_rect(colour = color.border),
+    # grid
+    panel.grid.major = ggplot2::element_line(color = color.grid.major, size = .25),
+    panel.spacing = unit(1, "lines"),
+    # margin
+    plot.margin = grid::unit(c(0.35, 0.2, 0.3, 0.35), "cm")
+  ) +
+  scale_color_manual(values = c("#1b263b", "#778da9","#778da9", "#778da9", "#778da9")) +
+  scale_linetype_manual(values = c("solid", "dashed"), labels = unname(TeX(c("$i^2 <= 0.4$", "$i^2 > 0.4$")))) +
+  # scale_y_discrete(labels = rev(c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "**Meta-Analysis**"))) +
+  scale_shape_manual(values = c(15, 16, 17, 18, 8)) +
+  xlab("Hazard Ratio") +
+  ylab("")
+```
+
+```{r}
+#| fig-align: center
+#| fig-width: 15
+#| fig-asp: 0.3
+#| out-width: "100%"
+#| fig-dpi: 500
+## Sensitivity COVID-19 positive test ----
+# Main figures for secondary ----
+cdmMain <- c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "META-ANALYSIS")
+estimates <- data$risk |>
+  mutate(cdm_name = if_else(cdm_name == "UiO Algorithm", "UiO", toupper(cdm_name))) |>
+  pivot_wider(names_from = "estimate_name", values_from = "estimate_value") |>
+  filter(
+    cdm_name %in% cdmMain,
+    covid_definition == "test",
+    regression == "cox-sandwich",
+    followup_end == "cohort_end_date_pregnancy",
+    variable_name == "study",
+    delivery_excluded %in% c("-", "yes"),
+    window == "15_Inf",
+    outcome != "icu_covid",
+    !(cdm_name == "CPRD GOLD" & outcome == "inpatient_covid")
+  ) |>
+  select(!estimate_type) |>
+  left_join(
+    data$survival_summary |>
+      mutate(cdm_name = if_else(cdm_name == "UiO Algorithm", "UiO", toupper(cdm_name))) |>
+      filter(grepl("count", estimate_name)) |>
+      select(!estimate_type) |>
+      pivot_wider(names_from = c("exposed", "estimate_name"), values_from = "estimate_value") |>
+      union_all(
+        data$survival_summary |>
+          filter(grepl("count", estimate_name)) |>
+          select(!estimate_type) |>
+          pivot_wider(names_from = c("exposed", "estimate_name"), values_from = "estimate_value") |>
+          group_by(
+            comparison, covid_definition, strata_name, strata_level, window, followup_end,
+            exposed_censoring, variable_name, outcome, delivery_excluded
+          ) |>
+          summarise(
+            unexposed_count = sum(unexposed_count, na.rm = TRUE), 
+            exposed_count = sum(exposed_count, na.rm = TRUE),
+            unexposed_count_events = sum(unexposed_count_events, na.rm = TRUE), 
+            exposed_count_events = sum(exposed_count_events, na.rm = TRUE), 
+            .groups = "drop"
+          ) |>
+          mutate(cdm_name = "META-ANALYSIS")
+      )
+  ) |>
+  mutate(
+    comparison = factor(
+      comparison, levels = c("none_first", "complete_booster"),
+      labels = c("Primary Vaccination Schema vs. Unvaccinated", "Booster vs. Primary Vaccination Schema")
+    ),
+    cdm_name = factor(
+      cdm_name, levels = c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "META-ANALYSIS")
+    ),
+    outcome = factor(
+      outcome, levels = c("covid", "inpatient_covid"), labels = c("COVID-19 infection", "COVID-19-related hospitalisation")
+    ),
+    across(
+      all_of(c("coef", "se_coef", "exp_coef", "z", "p", "lower_ci", "upper_ci", "i2")),
+      ~ if_else(is.na(unexposed_count) | is.na(exposed_count) | is.na(unexposed_count_events) | is.na(exposed_count_events), NA, .x)
+    ),
+    unexposed_count_events = if_else(
+      is.na(unexposed_count_events), "<5",
+      paste0(
+        niceNum(unexposed_count_events), " (", niceNum((unexposed_count_events/unexposed_count)*100, dec = 2),"%)"
+      )
+    ),
+    exposed_count_events = if_else(
+      is.na(exposed_count_events), "<5",
+      paste0(
+        niceNum(exposed_count_events), " (", niceNum((exposed_count_events/exposed_count)*100, dec = 2),"%)"
+      )
+    ),
+    across(
+      all_of(c("unexposed_count", "exposed_count")),
+      ~ if_else(is.na(.x), "<5", as.character(niceNum(.x)))
+    ),
+    `HR (95% CI)` = if_else(
+      !is.na(exp_coef), sprintf("   %.2f (%.2f - %.2f)", exp_coef, lower_ci, upper_ci), ""
+    ),
+    "VE" =  if_else(
+      !is.na(exp_coef), paste0(niceNum((1-exp_coef)*100, dec = 2), "%"), ""
+    )
+  ) |>
+  select(!c("covid_definition", "exposed_censoring", "followup_end", "window", "variable_name", "delivery_excluded", "regression")) |>
+  rename(
+    "Database" = "cdm_name"
+  )
+
+comparisonNms <- c("Primary Vaccination Schema vs. Unvaccinated", "Booster vs. Primary Vaccination Schema")
+for (ii in 1:2) {
+  cat("\n\n\\pagebreak\n")
+  cat("## ", paste0("**Appendix Figure ", num_figure, ":** Vaccine effectiveness estimates for ", comparisonNms[ii], ", when COVID-19 records are identified based on polymerase chain reaction (PCR) or antigen postitive tests."))
+  num_figure <- num_figure + 1
+  cat("\n")
+  fig1 <- estimates |>
+    filter(comparison == comparisonNms[ii], strata_name == "overall") |>
+    select(!starts_with("strata")) |>
+    arrange(outcome, Database) |>
+    mutate(
+      Database = paste0("      ", Database)
+      , " " = "                         ",
+      "  " = " ",
+      i2 = as.character(round(i2,4))
+    ) |>
+    select(outcome, Database, starts_with("exposed"), "  ", starts_with("unexposed"), " ",
+           starts_with("HR"), "VE", "i2", "exp_coef", "lower_ci", "upper_ci", "se_coef")
+
+  fig1 <- bind_rows(
+    tibble(Database = "COVID-19 infection"),
+    fig1[fig1$outcome == "COVID-19 infection", 2:15],
+    tibble(Database = ""),
+    tibble(Database = "COVID-19-related hospitalisation"),
+    fig1[fig1$outcome == "COVID-19-related hospitalisation", 2:15]
+  ) |>
+    mutate(across(any_of(colnames(fig1[,1:9])), ~if_else(is.na(.x), "", .x)))
+
+  thm <- forest_theme(
+    base_size = 11,
+    base_family = "",
+    ci_pch = 15,
+    ci_col = "black",
+    ci_alpha = 1,
+    ci_fill = NULL,
+    ci_lty = 1,
+    ci_lwd = 1,
+    ci_Theight = NULL,
+    legend_name = "Group",
+    legend_position = "right",
+    legend_value = "",
+    vertline_lwd = 1,
+    vertline_lty = "dashed",
+    vertline_col = "red",
+    summary_col = "#4575b4",
+    footnote_parse = TRUE,
+    title_just = c("center"),
+    arrow_type = c("open", "closed"),
+    arrow_label_just = c("start", "end"),
+    arrow_length = 0.05,
+    padding = unit(100, "mm")
+  )
+
+  fig1Forestploter <- fig1[,1:10]
+  colnames(fig1Forestploter) <- c(
+    "", "Population (N)", "Events (N(%))", " ", "Population (N)", "Events (N(%))", " ", " ", "VE", "i2"
+  )
+  fig1Forestploter[is.na(fig1Forestploter)] <- ""
+
+  p <- forest(
+    fig1Forestploter,
+    est = fig1$exp_coef,
+    lower = fig1$lower_ci,
+    upper = fig1$upper_ci,
+    sizes = 0.5,
+    x_trans = "log10",
+    ref_line = 1,
+    vert_line = NULL,
+    ci_column = 7,
+    is_summary = c(rep(FALSE, 5), TRUE, rep(FALSE, 5), TRUE),
+    xlim = NULL,
+    ticks_at = NULL,
+    ticks_digits = NULL,
+    ticks_minor = NULL,
+    arrow_lab = NULL,
+    footnote = NULL,
+    title = NULL,
+    nudge_y = 0,
+    fn_ci = makeci,
+    fn_summary = make_summary,
+    index_args = NULL,
+    theme = thm,
+    graphwidth = unit(5, "cm")
+  ) |>
+    # HR header
+    add_text(text = "HR (95% CI)",
+             part = "header",
+             col = 7:8,
+             gp = gpar(fontface = "bold")) |>
+    add_text(text = "Exposed",
+             part = "header",
+             row = 0,
+             col = 2:3,
+             gp = gpar(fontface = "bold")) |>
+    add_text(text = "Unexposed",
+             part = "header",
+             row = 0,
+             col = 5:6,
+             gp = gpar(fontface = "bold")) |>
+    add_text(text = "Database",
+             part = "header",
+             row = 1,
+             col = 1,
+             gp = gpar(fontface = "bold"),
+             just = c("left")) |>
+    add_border(part = "header",
+               row = 0,
+               col = 2:3,
+               gp = gpar(lwd = 0.3, alpha = 0.5)) |>
+    add_border(part = "header",
+               row = 0,
+               col = 5:6,
+               gp = gpar(lwd = 0.3, alpha = 0.5)) |>
+    add_border(part = "body",
+               row = c(1, 8),
+               where = c("bottom"),
+               gp = gpar(lwd = 1)) |>
+    add_border(part = "body",
+               row = c(1, 8),
+               where = c("top"),
+               gp = gpar(lwd = 1)) |>
+    edit_plot(col = 1, row = c(1, 8),
+              which = "text",
+              gp = gpar(fontface = "bold", fontsize = 12)) |>
+    edit_plot(row = c(6, 12),
+              which = "text",
+              gp = gpar(fontface = "bold")) |>
+    edit_plot(which = "background",
+              gp = gpar(fill = "#ffffff")) |>
+    edit_plot(row = c(2, 4, 6, 9, 11),
+              which = "background",
+              gp = gpar(fill = "#778da9", alpha = 0.1)) |>
+    edit_plot(row = c(1, 8),
+              which = "background",
+              gp = gpar(fill = "#778da9", alpha = 0.3)) |>
+    edit_plot(col = 7, row = c(6, 12), which = "ci",
+              gp = gpar(col = "#415a77", fill = "#415a77"))
+  print(p)
+}
+
+# # By trimester, secondary ----
+# cat("\n\n\\pagebreak\n")
+# cat("## ", paste0("**Appendix Figure ", num_figure, ":** Hazard Ratios for COVID-19 Infection and Hospitalisation (Primary Vaccination Schema vs. Unvaccinated, and Booster vs. Primary Vaccination Schema) stratified by pregnancy trimester at time of vaccination, when COVID-19 records are identified based on polymerase chain reaction (PCR) or antigen postitive tests."))
+# num_figure <- num_figure + 1
+# cat("\n")
+# fig2 <- estimates |>
+#   filter(strata_name == "trimester") |>
+#   splitStrata() |>
+#   mutate(
+#     trimester = factor(trimester, levels = c("T1", "T2", "T3"), labels = paste0("Trimester ", 1:3)),
+#     Database = factor(Database,
+#                       levels = rev(cdmMain)),
+#     meta = grepl("Meta", Database),
+#     Hetereogeneity = if_else(i2<=0.4 | is.na(i2) , "i2 <= 0.4", "i2>0.4")
+#   ) |>
+#   arrange(outcome, trimester, Database)
+# 
+# color.background <- "#ffffff"
+# color.grid.major <- "#d9d9d9"
+# color.axis.text <- "#252525"
+# color.axis.title <- "#252525"
+# color.border <- "#595959"
+# fontsizeRef = 13
+# ggplot(fig2, aes(x = exp_coef, xmin = lower_ci, xmax = upper_ci, y = Database)) +
+#   facet_nested(trimester ~ comparison + outcome , scales = "free_y") +
+#   geom_point(aes(x = exp_coef, shape = Database, color = Database), size = 3) +
+#   geom_linerange(aes(xmin = lower_ci, xmax = upper_ci, color = Database, linetype = Hetereogeneity), size = 0.8) +
+#   scale_x_continuous(limits = c(0.07, 4), breaks = c(0.1, 0.25, 0.5, 1, 2, 4), trans = "log10",
+#                      oob=scales::rescale_none) +
+#   geom_vline(xintercept = 1)  +
+#   geom_rect(aes(xmin = 0.01, xmax = 10, ymin = 0.5, ymax = 1.5),
+#             fill = "#001427",
+#             alpha = 0.02,
+#             color = "#eaf4f4",
+#             linetype = 0) +
+#   ggplot2::theme_bw() +
+#   ggplot2::theme(
+#     # facet
+#     strip.text = ggplot2::element_text(face = "bold", size = fontsizeRef-1),
+#     strip.background = ggplot2::element_rect(fill = "#e5e6e4", colour = color.border),
+#     strip.switch.pad.grid = unit(10, "cm"),
+#     # # title
+#     plot.title = ggplot2::element_text(face = "bold", size = fontsizeRef+2),
+#     # axis
+#     axis.text.y = ggtext::element_markdown(size = fontsizeRef-1, color = color.axis.text),
+#     axis.text.x = ggplot2::element_text(size = fontsizeRef-1, color = color.axis.text),
+#     axis.title.x = ggplot2::element_text(size = fontsizeRef, vjust = 0, color = color.axis.title),
+#     axis.title.y = ggplot2::element_text(size = fontsizeRef, vjust = 1.25, color = color.axis.title),
+#     # legend
+#     legend.text = ggplot2::element_text(size = fontsizeRef-1),
+#     legend.title = ggplot2::element_text(size = fontsizeRef, face = "bold"),
+#     # background
+#     panel.background = ggplot2::element_rect(fill = color.background, colour = color.background),
+#     plot.background = ggplot2::element_rect(fill = color.background, colour = color.background),
+#     panel.border = ggplot2::element_rect(colour = color.border),
+#     # grid
+#     panel.grid.major = ggplot2::element_line(color = color.grid.major, size = .25),
+#     panel.spacing = unit(1, "lines"),
+#     # margin
+#     plot.margin = grid::unit(c(0.35, 0.2, 0.3, 0.35), "cm")
+#   ) +
+#   scale_color_manual(values = c("#1b263b", "#778da9","#778da9", "#778da9", "#778da9")) +
+#   scale_linetype_manual(values = c("solid", "dashed"), labels = unname(TeX(c("$i^2 \\leq 0.4$", "$i^2 > 0.4$")))) +
+#   scale_y_discrete(labels = rev(c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "**META-ANALYSIS**"))) +
+#   scale_shape_manual(values = c(15, 16, 17, 18, 8)) +
+#   xlab("Hazard Ratio")
+# 
+# 
+# # by vaccine brand for secondary ----
+# cat("\n\n\\pagebreak\n")
+# cat("## ", paste0("**Appendix Figure ", num_figure, ":** Hazard Ratios for COVID-19 Infection and Hospitalisation (Primary Vaccination Schema vs. Unvaccinated, and Booster vs. Primary Vaccination Schema) stratified by vaccine brand, when COVID-19 records are identified based on polymerase chain reaction (PCR) or antigen postitive tests."))
+# num_figure <- num_figure + 1
+# cat("\n")
+# vaxProduct <- data$risk |>
+#   mutate(cdm_name = if_else(cdm_name == "UiO Algorithm", "UiO", toupper(cdm_name))) |>
+#   filter(
+#     strata_name == "vaccine_brand", covid_definition == "diagnostic_test", 
+#     cdm_name %in% c("SCIFI-PEARL", "UiO", "SIDIAP", "CPRD GOLD", "META-ANALYSIS"),
+#     regression == "cox-sandwich", followup_end == "cohort_end_date_pregnancy",
+#     delivery_excluded %in% c("yes", "-"), variable_name == "study", outcome != "icu_covid",
+#     window == "15_Inf"
+#   ) |>
+#   splitStrata() |>
+#   pivot_wider(names_from = "estimate_name", values_from = "estimate_value") |>
+#   mutate(
+#     vaccine_brand = factor(vaccine_brand, levels = c("pfizer", "moderna"), labels = c("Pfizer", "Moderna")),
+#     Database = factor(cdm_name, levels = rev(c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "META-ANALYSIS")),
+#                       labels = rev(c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "Meta-Analysis"))),
+#     meta = grepl("Meta", Database),
+#     Hetereogeneity = if_else(i2<=0.4 | is.na(i2) , "i2 <= 0.4", "i2>0.4"),
+#     outcome = factor(
+#       outcome, levels = c("covid", "inpatient_covid"), labels = c("COVID-19 infection", "COVID-19-related hospitalisation")
+#     ),
+#     comparison = factor(
+#       comparison, levels = c("none_first", "complete_booster"),
+#       labels = c("Primary Vaccination Schema vs. Unvaccinated", "Booster vs. Primary Vaccination Schema")
+#     )
+#   ) |>
+#   arrange(Database, outcome, vaccine_product)
+# 
+# vaxProduct |>
+#   ggplot(aes(x = exp_coef, xmin = lower_ci, xmax = upper_ci, y = Database)) +
+#   facet_nested(vaccine_brand ~ comparison + outcome , scales = "free_y") +
+#   geom_point(aes(x = exp_coef, shape = Database, color = Database), size = 3) +
+#   geom_linerange(aes(xmin = lower_ci, xmax = upper_ci, color = Database, linetype = Hetereogeneity), size = 0.8) +
+#   scale_x_continuous(limits = c(0.1, 4), breaks = c(0.1, 0.25, 0.5, 1, 2, 4), trans = "log10",
+#                      oob=scales::rescale_none) +
+#   geom_vline(xintercept = 1)  +
+#   geom_rect(aes(xmin = 0.01, xmax = 10, ymin = 0.5, ymax = 1.5),
+#             fill = "#001427",
+#             alpha = 0.02,
+#             color = "#eaf4f4",
+#             linetype = 0) +
+#   ggplot2::theme_bw() +
+#   ggplot2::theme(
+#     # facet
+#     strip.text = ggplot2::element_text(face = "bold", size = fontsizeRef-1),
+#     strip.background = ggplot2::element_rect(fill = "#e5e6e4", colour = color.border),
+#     strip.switch.pad.grid = unit(10, "cm"),
+#     # # title
+#     plot.title = ggplot2::element_text(face = "bold", size = fontsizeRef+2),
+#     # axis
+#     axis.text.y = ggtext::element_markdown(size = fontsizeRef-1, color = color.axis.text),
+#     axis.text.x = ggplot2::element_text(size = fontsizeRef-1, color = color.axis.text),
+#     axis.title.x = ggplot2::element_text(size = fontsizeRef, vjust = 0, color = color.axis.title),
+#     axis.title.y = ggplot2::element_text(size = fontsizeRef, vjust = 1.25, color = color.axis.title),
+#     # legend
+#     legend.text = ggplot2::element_text(size = fontsizeRef-1),
+#     legend.title = ggplot2::element_text(size = fontsizeRef),
+#     # background
+#     panel.background = ggplot2::element_rect(fill = color.background, colour = color.background),
+#     plot.background = ggplot2::element_rect(fill = color.background, colour = color.background),
+#     panel.border = ggplot2::element_rect(colour = color.border),
+#     # grid
+#     panel.grid.major = ggplot2::element_line(color = color.grid.major, size = .25),
+#     panel.spacing = unit(1, "lines"),
+#     # margin
+#     plot.margin = grid::unit(c(0.35, 0.2, 0.3, 0.35), "cm")
+#   ) +
+#   scale_color_manual(values = c("#1b263b", "#778da9","#778da9", "#778da9", "#778da9")) +
+#   scale_linetype_manual(values = c("solid", "dashed"), labels = unname(TeX(c("$i^2 \\leq 0.4$", "$i^2 > 0.4$")))) +
+#   # scale_y_discrete(labels = rev(c("CPRD GOLD", "SCIFI-PEARL", "SIDIAP", "UiO", "**Meta-Analysis**"))) +
+#   scale_shape_manual(values = c(15, 16, 17, 18, 8)) +
+#   xlab("Hazard Ratio") +
+#   ylab("")
+```

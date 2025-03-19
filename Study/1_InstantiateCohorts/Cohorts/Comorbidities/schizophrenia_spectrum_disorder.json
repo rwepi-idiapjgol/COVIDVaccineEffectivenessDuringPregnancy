@@ -1,0 +1,105 @@
+{
+  "ConceptSets": [
+    {
+      "id": 0,
+      "name": "\n\nSchizophrenia",
+      "expression": {
+        "items": [
+          {
+            "concept": {
+              "CONCEPT_CLASS_ID": "Domain",
+              "CONCEPT_CODE": "OMOP generated",
+              "CONCEPT_ID": 1,
+              "CONCEPT_NAME": "Domain",
+              "DOMAIN_ID": "Metadata",
+              "INVALID_REASON": "V",
+              "INVALID_REASON_CAPTION": "Valid",
+              "STANDARD_CONCEPT": "N",
+              "STANDARD_CONCEPT_CAPTION": "Non-Standard",
+              "VOCABULARY_ID": "Domain"
+            }
+          },
+          {
+            "concept": {
+              "CONCEPT_CLASS_ID": "Domain",
+              "CONCEPT_CODE": "OMOP generated",
+              "CONCEPT_ID": 12,
+              "CONCEPT_NAME": "Modifier",
+              "DOMAIN_ID": "Metadata",
+              "INVALID_REASON": "V",
+              "INVALID_REASON_CAPTION": "Valid",
+              "STANDARD_CONCEPT": "N",
+              "STANDARD_CONCEPT_CAPTION": "Non-Standard",
+              "VOCABULARY_ID": "Domain"
+            }
+          },
+          {
+            "concept": {
+              "CONCEPT_CLASS_ID": "Domain",
+              "CONCEPT_CODE": "OMOP generated",
+              "CONCEPT_ID": 31,
+              "CONCEPT_NAME": "Relationship",
+              "DOMAIN_ID": "Metadata",
+              "INVALID_REASON": "V",
+              "INVALID_REASON_CAPTION": "Valid",
+              "STANDARD_CONCEPT": "N",
+              "STANDARD_CONCEPT_CAPTION": "Non-Standard",
+              "VOCABULARY_ID": "Domain"
+            }
+          },
+          {
+            "concept": {
+              "CONCEPT_CLASS_ID": "Clinical Finding",
+              "CONCEPT_CODE": "58214004",
+              "CONCEPT_ID": 435783,
+              "CONCEPT_NAME": "Schizophrenia",
+              "DOMAIN_ID": "Condition",
+              "INVALID_REASON": "V",
+              "INVALID_REASON_CAPTION": "Valid",
+              "STANDARD_CONCEPT": "S",
+              "STANDARD_CONCEPT_CAPTION": "Standard",
+              "VOCABULARY_ID": "SNOMED"
+            },
+            "includeDescendants": true
+          }
+        ]
+      }
+    }
+  ],
+  "PrimaryCriteria": {
+    "CriteriaList": [
+      {
+        "ConditionOccurrence": {
+          "CodesetId": 0
+        }
+      }
+    ],
+    "ObservationWindow": {
+      "PriorDays": 0,
+      "PostDays": 0
+    },
+    "PrimaryCriteriaLimit": {
+      "Type": "All"
+    }
+  },
+  "QualifiedLimit": {
+    "Type": "First"
+  },
+  "ExpressionLimit": {
+    "Type": "First"
+  },
+  "InclusionRules": [],
+  "EndStrategy": {
+    "DateOffset": {
+      "DateField": "StartDate",
+      "Offset": 0
+    }
+  },
+  "CensoringCriteria": [],
+  "CollapseSettings": {
+    "CollapseType": "ERA",
+    "EraPad": 0
+  },
+  "CensorWindow": {},
+  "cdmVersionRange": ">=5.0.0"
+}
