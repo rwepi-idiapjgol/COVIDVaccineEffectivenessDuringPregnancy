@@ -1,4 +1,4 @@
-# Perinatal COVID-19 vaccine effectiveness
+# Effectiveness of COVID-19 mRNA primary and booster vaccination during pregnancy: a target trial emulation and meta-analysis of data from 4 European countries 
 You can download this repository as a zip folder using Code -> Download ZIP.
 ## Diagnostics
 In the folder **Diagnostics** there is code for running phenotype diagnostics and for deploying the shiny with the results.
